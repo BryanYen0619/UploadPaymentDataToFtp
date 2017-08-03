@@ -1,14 +1,15 @@
-<!DOCTYPE html>
-<html>
-<body>
-
 <?php
 
+$reUpload = 0;
+
 $payment_files = getIsPayment();
-formatPaymentTxt();
-// echo '<pre>';
-// echo "Search status array size: ", var_dump($payment_files), "</br>";
-// echo '</pre>';
+$formatPaymentData = formatPaymentTxt($payment_files);
+echo '<pre>';
+echo "Search status array size: ", var_dump($payment_files), "</br>";
+echo '</pre>';
+
+// $uploadFileName = saveUploadTxtFile($formatPaymentData);
+// uploadFileToFtp($uploadFileName);
 
 function getIsPayment()
 {
@@ -17,25 +18,34 @@ function getIsPayment()
     $password = "Abcd1234";
     $dbName = "tokyo_payment_test";
 
-  // Create connection
-  $mysqli = new mysqli($serverName, $userName, $password, $dbName);
+    // Create connection
+    $mysqli = new mysqli($serverName, $userName, $password, $dbName);
     mysqli_query($mysqli, "SET CHARACTER SET UTF8");
-  // Check connection
-  if ($mysqli->connect_error) {
-      die("Connection failed: " . $mysqli->connect_error);
-  }
+    // Check connection
+    if ($mysqli->connect_error) {
+        die("Connection failed: " . $mysqli->connect_error);
+    }
 
-  // SQL 取出fee_order符合資料
-  $searchStatusSqlCmd = "SELECT id, household_number, status
-                         FROM fee_order
-                         WHERE status
-                         LIKE BINARY '%已繳費%'
-                         AND upload_time IS NULL";
+    // SQL 取出fee_order符合資料
+    $searchStatusSqlCmd = "SELECT *
+                           FROM fee_order
+                           WHERE status
+                           LIKE BINARY '%已繳費%'
+                           AND upload_time IS NULL";
     $searchStatusFromSql = $mysqli->query($searchStatusSqlCmd);
     if ($searchStatusFromSql) {
         $i = 0;
         while ($row=$searchStatusFromSql->fetch_array(MYSQLI_ASSOC)) {
-            $payment_files[$i] = $row['household_number'];
+            $payment_files[$i] = array(
+              $row['account'],
+              $row['household_number'],
+              $row['begin_time'],
+              $row['virtual_account_id'],
+              $row['pay_time'],
+              $row['payment_way'],
+              $row['amount_payable']
+            );
+
             $i++;
         }
     } else {
@@ -43,38 +53,38 @@ function getIsPayment()
     }
 
     $searchStatusFromSql ->free();
-  // Close DB
-  $mysqli->close();
+    // Close DB
+    $mysqli->close();
 
     return $payment_files;
 }
 
-function formatPaymentTxt()
+function formatPaymentTxt($payment_files)
 {
     $success = 10;
     $error = 0;
 
-    $id = '34';
-    $accountId = 'testasaaaa';
-    $creatDate='10608';
-    $virtualAccount='jgagjalsgmcadf';
-    $payDate='1060710';
-    $inBankDate='1060713';
-    $collectionStore='asdfghjj';
-    $collectionMoney=200;
-    $fees=30;
-    $inBankMoney=200;
+    $id = substr($payment_files[194][0], 0, 5);
+    $accountId = $payment_files[194][1];
+    $creatDate=$payment_files[194][2];
+    $virtualAccount=$payment_files[194][3];
+    $payDate=$payment_files[194][4];
+    $paymentWay =$payment_files[194][5];
+    $collectionStore='7-11';
+    $collectionMoney='7';
+    $fees='7';
+    $inBankMoney=$payment_files[194][6];
 
-    $id=str_pad($id,5,'_',STR_PAD_LEFT);
-    $accountId=str_pad($accountId,10,'_', STR_PAD_LEFT);
-    $creatDate=str_pad($creatDate, 5, '_', STR_PAD_LEFT);
-    $virtualAccount =str_pad($virtualAccount, 14, '_', STR_PAD_LEFT);
-    $payDate=str_pad($payDate, 7, '_', STR_PAD_LEFT);
-    $inBankDate=str_pad($inBankDate, 7, '_', STR_PAD_LEFT);
-    $collectionStore=str_pad($collectionStore, 8, '_', STR_PAD_LEFT);
-    $collectionMoney=str_pad($collectionMoney, 14, 0, STR_PAD_LEFT);
-    $fees=str_pad($fees, 7, 0 , STR_PAD_LEFT);
-    $inBankMoney=str_pad($inBankMoney, 14, 0, STR_PAD_LEFT);
+    $id = str_pad($id, 5);
+    $accountId = str_pad($accountId, 10);
+    $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
+    $virtualAccount = str_pad($virtualAccount, 14);
+    $inBankDate = str_pad(getInBankDateFromPaymentWay($payDate, $paymentWay), 7);
+    $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
+    $collectionStore = str_pad($collectionStore, 8);
+    $collectionMoney = str_pad($collectionMoney, 14);
+    $fees = str_pad($fees, 7);
+    $inBankMoney = str_pad($inBankMoney, 14);
 
     if (strlen($id) != 5) {
         echo '[1] id length error.', '</br>';
@@ -82,7 +92,7 @@ function formatPaymentTxt()
     }
 
     if (strlen($accountId) != 10) {
-        echo '[2] accountId length error.', '</br>';
+        echo '[2] accountId length error.'.'</br>';
         $error++;
     }
 
@@ -111,80 +121,144 @@ function formatPaymentTxt()
         $error++;
     }
 
-    if ($collectionMoney == 0) {
+    if (strlen($collectionMoney) < 0) {
         echo '[8] collection money length error', '</br>';
         $error++;
     }
 
-    if ($fees < 0) {
+    if (strlen($fees) < 0) {
         echo '[9] fees length error', '</br>';
         $error++;
     }
 
-    if ($inBankMoney == 0) {
+    if (strlen($inBankMoney) < 0) {
         echo '[10] in bank money length error', '</br>';
         $error++;
     }
 
+    $formatPaymentData = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
+
     echo '</br>';
     echo 'Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
-
-    echo $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
-
-
+    echo $formatPaymentData.'</br>';
+    echo 'length : '.strlen($formatPaymentData).'</br>';
 
 
+    return $formatPaymentData;
 }
 
-function saveUploadTxtFile() {
-  date_default_timezone_set("Asia/Taipei");
-  $nowDate = date('Ymd');
+function saveUploadTxtFile($formatPaymentData)
+{
+    date_default_timezone_set("Asia/Taipei");
+    $nowDate = date('Ymd');
+    $fileName = 'ToCVMS -'.$nowDate.'.txt';
+    $myfile = fopen($fileName, "w") or die("Unable to open file!");
+    fwrite($myfile, $formatPaymentData);
+    fclose($myfile);
 
-
-  $fileName = 'ToCVMS -'.$nowDate.'.txt';
-  $myfile = fopen($fileName, "w") or die("Unable to open file!");
-  $txt = "Hello World PHP";
-  fwrite($myfile, $txt);
-  fclose($myfile);
+    return $fileName;
 }
 
-function uploadFileToFtp() {
-  $file = 'upload_file.txt';   ### 上傳的檔案
-  $fp = fopen($file, 'r');
+function uploadFileToFtp($uploadFileName)
+{
+    $fp = fopen($uploadFileName, 'r');
 
-  ### 連接的 FTP 伺服器是 localhost
-  $conn_id = ftp_connect('localhost');
+    ### 連接的 FTP 伺服器是 localhost
+    $conn_id = ftp_connect('localhost');
 
-  ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
-  $login_result = ftp_login($conn_id, 'root', 'Abcd1234');
+    ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
+    $login_result = ftp_login($conn_id, 'root', 'Abcd1234');
 
-  $logMessage = '';
-  if (ftp_fput($conn_id, $file, $fp, FTP_ASCII)) {
-      echo "成功上傳 $file\n";
-      $logMessage = 'upload success.';
-  } else {
-      echo "上傳檔案 $file 失敗\n";
-      $logMessage = 'upload error.';
-  }
-  saveLogTxtFile($logMessage);
+    $logMessage = '';
+    if (ftp_fput($conn_id, $file, $fp, FTP_ASCII)) {
+        echo "成功上傳 $file\n";
+        $logMessage = 'upload success.';
+    } else {
+        echo "上傳檔案 $file 失敗\n";
+        $logMessage = 'upload error.';
 
-  ftp_close($conn_id);
-  fclose($fp);
+        if ($reUpload < 3) {
+            sleep(900);
+            uploadFileToFtp();
+            $reUpload++;
+        } else {
+            $logMessage = 'Re Upload All Error.';
+        }
+    }
+    saveLogTxtFile($logMessage);
+
+    ftp_close($conn_id);
+    fclose($fp);
 }
 
-function saveLogTxtFile($message) {
-  date_default_timezone_set("Asia/Taipei");
-  $nowDate = date('Y-m-d H:i:s');
+function saveLogTxtFile($message)
+{
+    date_default_timezone_set("Asia/Taipei");
+    $nowDate = date('Y-m-d H:i:s');
+    $fileName = 'TokyoCVMSLog.txt';
+    $myfile = fopen($fileName, 'a') or die("Unable to open file!");
+    $txt = $nowDate.'      '.$message.PHP_EOL;
+    fwrite($myfile, $txt);
+    fclose($myfile);
+}
 
+function convertDateToUploadFtpFormat($date, $format = 'Y-m-d', $addDayCount = 0)
+{
+    date_default_timezone_set("Asia/Taipei");
+    $tempYear = date('Y', strtotime($date)) - 1911;
+    $tempMonthAndDay = '';
+    if ($format == 'Y-m-d') {
+        $tempMonth = date('m', strtotime($date));
+        $tempDay = date('d', strtotime($date)) + $addDayCount;
+        $tempMonthAndDay = $tempMonth.$tempDay;
+    }
+    if ($format == 'Y-m') {
+        $tempMonthAndDay = date('m', strtotime($date));
+    }
+    $convertDate = $tempYear.$tempMonthAndDay;
 
-  $fileName = 'TokyoCVMSLog.txt';
-  $myfile = fopen($fileName, 'a') or die("Unable to open file!");
-  $txt = $nowDate.'      '.$message.PHP_EOL;
-  fwrite($myfile, $txt);
-  fclose($myfile);
+    echo 'convert date: '.$convertDate.'</br>';
+
+    return $convertDate;
+}
+
+function getInBankDateFromPaymentWay($payDate, $paymentWay)
+{
+    date_default_timezone_set("Asia/Taipei");
+    $weekday = date("w", $payDate);   // Sunday = 0, Saturday = 6
+    $weekdayCount = 0;
+    // 判斷是否在假日
+    if ($weekday == 0) {
+        $weekdayCount = 1;
+    }
+    if ($weekday == 6) {
+        $weekdayCount = 2;
+    }
+
+    switch ($paymentWay) {
+      case 0:
+        // 信用卡
+        $inBankDate = convertDateToUploadFtpFormat($payDate, 'Y-m-d', 1 + $weekdayCount);
+        break;
+      case 1:
+        // 臨櫃匯款
+        $inBankDate = convertDateToUploadFtpFormat($payDate, 'Y-m-d', 1 + $weekdayCount);
+        break;
+      case 2:
+        // ATM轉帳
+        $inBankDate = convertDateToUploadFtpFormat($payDate, 'Y-m-d', 1 + $weekdayCount);
+        break;
+      case 3:
+        // 超商代收
+        $inBankDate = convertDateToUploadFtpFormat($payDate, 'Y-m-d', 3 + $weekdayCount);
+        break;
+      default:
+        $inBankDate = '00000000';
+        // 沒繳錢
+        break;
+    }
+
+    return $inBankDate;
 }
 
 ?>
-
-</body>
-</html>
