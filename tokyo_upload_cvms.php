@@ -4,21 +4,23 @@
 $reUpload = 0;
 
 $payment_files = getIsPayment();
-$formatPaymentData = formatPaymentTxt($payment_files);
 echo '<pre>';
 echo "Search status array size: ", var_dump($payment_files), "</br>";
 echo '</pre>';
 
-// $uploadFileName = saveUploadTxtFile($formatPaymentData);
-// uploadFileToFtp($uploadFileName);
+$formatPaymentData = formatPaymentTxt($payment_files);
+$uploadFileName = saveUploadTxtFile($formatPaymentData);
+// $conn_id = connectFtpServer();
+// uploadFileToFtp($conn_id, $uploadFileName);
+
+echo 'END.'.'</br>';
 
 function getIsPayment()
 {
     // SQL 取出fee_order符合資料
     $searchStatusSqlCmd = "SELECT *
                            FROM fee_order
-                           WHERE status
-                           LIKE BINARY '%已繳費%'
+                           WHERE status LIKE BINARY '%已繳費%'
                            AND upload_time IS NULL";
     $searchStatusFromSql = mysql_query($searchStatusSqlCmd);
     if ($searchStatusFromSql) {
@@ -45,134 +47,158 @@ function getIsPayment()
 
 function formatPaymentTxt($payment_files)
 {
-    $success = 10;
-    $error = 0;
+    if (count($payment_files) > 0) {
+        $success = 10;
+        $error = 0;
 
-    $id = substr($payment_files[194][0], 0, 5);
-    $accountId = $payment_files[194][1];
-    $creatDate=$payment_files[194][2];
-    $virtualAccount=$payment_files[194][3];
-    $payDate=$payment_files[194][4];
-    $paymentWay =$payment_files[194][5];
-    $collectionStore='7-11';
-    $collectionMoney='7';
-    $fees='7';
-    $inBankMoney=$payment_files[194][6];
+        $id = substr($payment_files[194][0], 0, 5);
+        $accountId = $payment_files[194][1];
+        $creatDate=$payment_files[194][2];
+        $virtualAccount=$payment_files[194][3];
+        $payDate=$payment_files[194][4];
+        $paymentWay =$payment_files[194][5];
+        $collectionStore='7-11';
+        $collectionMoney='7';
+        $fees='7';
+        $inBankMoney=$payment_files[194][6];
 
-    $id = str_pad($id, 5);
-    $accountId = str_pad($accountId, 10);
-    $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
-    $virtualAccount = str_pad($virtualAccount, 14);
-    $inBankDate = str_pad(getInBankDateFromPaymentWay($payDate, $paymentWay), 7);
-    $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
-    $collectionStore = str_pad($collectionStore, 8);
-    $collectionMoney = str_pad($collectionMoney, 14);
-    $fees = str_pad($fees, 7);
-    $inBankMoney = str_pad($inBankMoney, 14);
+        $id = str_pad($id, 5);
+        $accountId = str_pad($accountId, 10);
+        $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
+        $virtualAccount = str_pad($virtualAccount, 14);
+        $inBankDate = str_pad(getInBankDateFromPaymentWay($payDate, $paymentWay), 7);
+        $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
+        $collectionStore = str_pad($collectionStore, 8);
+        $collectionMoney = str_pad($collectionMoney, 14);
+        $fees = str_pad($fees, 7);
+        $inBankMoney = str_pad($inBankMoney, 14);
 
-    if (strlen($id) != 5) {
-        echo '[1] id length error.', '</br>';
-        $error++;
+        if (strlen($id) != 5) {
+            echo '[1] id length error.', '</br>';
+            $error++;
+        }
+
+        if (strlen($accountId) != 10) {
+            echo '[2] accountId length error.'.'</br>';
+            $error++;
+        }
+
+        if (strlen($creatDate) != 5) {
+            echo '[3] create date length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($virtualAccount) != 14) {
+            echo '[4] virtual account length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($payDate) != 7) {
+            echo '[5] pay date length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($inBankDate) != 7) {
+            echo '[6] in bank date length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($collectionStore) != 8) {
+            echo '[7] collection store length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($collectionMoney) < 0) {
+            echo '[8] collection money length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($fees) < 0) {
+            echo '[9] fees length error', '</br>';
+            $error++;
+        }
+
+        if (strlen($inBankMoney) < 0) {
+            echo '[10] in bank money length error', '</br>';
+            $error++;
+        }
+
+        $formatPaymentData = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
+
+        echo '</br>';
+        echo 'Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
+        echo $formatPaymentData.'</br>';
+        echo 'length : '.strlen($formatPaymentData).'</br>';
+
+
+        return $formatPaymentData;
     }
-
-    if (strlen($accountId) != 10) {
-        echo '[2] accountId length error.'.'</br>';
-        $error++;
-    }
-
-    if (strlen($creatDate) != 5) {
-        echo '[3] create date length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($virtualAccount) != 14) {
-        echo '[4] virtual account length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($payDate) != 7) {
-        echo '[5] pay date length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($inBankDate) != 7) {
-        echo '[6] in bank date length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($collectionStore) != 8) {
-        echo '[7] collection store length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($collectionMoney) < 0) {
-        echo '[8] collection money length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($fees) < 0) {
-        echo '[9] fees length error', '</br>';
-        $error++;
-    }
-
-    if (strlen($inBankMoney) < 0) {
-        echo '[10] in bank money length error', '</br>';
-        $error++;
-    }
-
-    $formatPaymentData = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
-
-    echo '</br>';
-    echo 'Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
-    echo $formatPaymentData.'</br>';
-    echo 'length : '.strlen($formatPaymentData).'</br>';
-
-
-    return $formatPaymentData;
 }
 
 function saveUploadTxtFile($formatPaymentData)
 {
-    date_default_timezone_set("Asia/Taipei");
-    $nowDate = date('Ymd');
-    $fileName = 'ToCVMS -'.$nowDate.'.txt';
-    $myfile = fopen($fileName, "w") or die("Unable to open file!");
-    fwrite($myfile, $formatPaymentData);
-    fclose($myfile);
+    if (count($formatPaymentData) > 0) {
+        date_default_timezone_set("Asia/Taipei");
+        $nowDate = date('Ymd');
+        $fileName = 'ToCVMS-'.$nowDate.'.TXT';
+        $myfile = fopen($fileName, "w") or die("Unable to open file!");
+        fwrite($myfile, $formatPaymentData);
+        fclose($myfile);
 
-    return $fileName;
+        return $fileName;
+    }
 }
 
-function uploadFileToFtp($uploadFileName)
+function connectFtpServer()
 {
-    $fp = fopen($uploadFileName, 'r');
-
     ### 連接的 FTP 伺服器是 localhost
-    $conn_id = ftp_connect('localhost');
-
-    ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
-    $login_result = ftp_login($conn_id, 'root', 'Abcd1234');
-
-    $logMessage = '';
-    if (ftp_fput($conn_id, $file, $fp, FTP_ASCII)) {
-        echo "成功上傳 $file\n";
-        $logMessage = 'upload success.';
-    } else {
-        echo "上傳檔案 $file 失敗\n";
-        $logMessage = 'upload error.';
-
-        if ($reUpload < 3) {
-            sleep(900);
-            uploadFileToFtp();
-            $reUpload++;
-        } else {
-            $logMessage = 'Re Upload All Error.';
-        }
+  $conn_id = ftp_connect('ip');
+    if ($conn_id == false) {
+        echo "Connect ftp error.","</br>";
     }
-    saveLogTxtFile($logMessage);
 
-    ftp_close($conn_id);
-    fclose($fp);
+  ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
+  $login_result = ftp_login($conn_id, 'user', 'pass');
+    if ($login_result == false) {
+        echo "Ftp login error.","</br>";
+    }
+
+  //換目錄
+  if (ftp_chdir($conn_id, "ap-cvms")) {
+      echo "Current directory is now: " . ftp_pwd($conn_id) . "</br>";
+  } else {
+      echo "Couldn't change directory.</br>";
+  }
+
+    return $conn_id;
+}
+
+function uploadFileToFtp($conn_id, $uploadFileName)
+{
+    if (count($uploadFileName) > 0) {
+        $fp = fopen($uploadFileName, 'r');
+        $logMessage = '';
+        if (ftp_fput($conn_id, $uploadFileName, $fp, FTP_ASCII)) {
+            echo "成功上傳 $file\n";
+            $logMessage = 'upload success.';
+            updateUploadTimeToDb();
+        } else {
+            echo "上傳檔案 $file 失敗\n";
+            $logMessage = 'upload error.';
+
+            if ($reUpload < 3) {
+                sleep(900);
+                uploadFileToFtp();
+                $reUpload++;
+            } else {
+                $logMessage = 'Re Upload All Error.';
+            }
+        }
+        saveLogTxtFile($logMessage);
+
+        ftp_close($conn_id);
+        fclose($fp);
+    }
 }
 
 function saveLogTxtFile($message)
@@ -245,8 +271,22 @@ function getInBankDateFromPaymentWay($payDate, $paymentWay)
     return $inBankDate;
 }
 
-function insertUploadTimeToDb() {
+function updateUploadTimeToDb()
+{
+    date_default_timezone_set("Asia/Taipei");
+    $upload_time = date('Y-m-d H:i:s');
 
+    $updateUploadTimeSqlCmd = "UPDATE fee_order
+                             SET upload_time = '$upload_time'
+                             WHERE status LIKE BINARY '%已繳費%'
+                             AND upload_time IS NULL";
+
+    $updateUploadTimeToSql = mysql_query($updateUploadTimeSqlCmd);
+    if ($updateUploadTimeToSql) {
+        echo 'update upload_time to fee_order Success.'.'</br>';
+    } else {
+        echo 'update upload_time to fee_order Error.'. '</br>';
+    }
 }
 
 ?>
