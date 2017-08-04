@@ -1,3 +1,4 @@
+<?php require_once('Connections/link.php');?>
 <?php
 
 $reUpload = 0;
@@ -13,29 +14,16 @@ echo '</pre>';
 
 function getIsPayment()
 {
-    $serverName = "localhost";
-    $userName = "root";
-    $password = "Abcd1234";
-    $dbName = "tokyo_payment_test";
-
-    // Create connection
-    $mysqli = new mysqli($serverName, $userName, $password, $dbName);
-    mysqli_query($mysqli, "SET CHARACTER SET UTF8");
-    // Check connection
-    if ($mysqli->connect_error) {
-        die("Connection failed: " . $mysqli->connect_error);
-    }
-
     // SQL 取出fee_order符合資料
     $searchStatusSqlCmd = "SELECT *
                            FROM fee_order
                            WHERE status
                            LIKE BINARY '%已繳費%'
                            AND upload_time IS NULL";
-    $searchStatusFromSql = $mysqli->query($searchStatusSqlCmd);
+    $searchStatusFromSql = mysql_query($searchStatusSqlCmd);
     if ($searchStatusFromSql) {
         $i = 0;
-        while ($row=$searchStatusFromSql->fetch_array(MYSQLI_ASSOC)) {
+        while ($row= mysql_fetch_assoc($searchStatusFromSql)) {
             $payment_files[$i] = array(
               $row['account'],
               $row['household_number'],
@@ -51,10 +39,6 @@ function getIsPayment()
     } else {
         echo "Search not found From fee_order.", "</br>";
     }
-
-    $searchStatusFromSql ->free();
-    // Close DB
-    $mysqli->close();
 
     return $payment_files;
 }
@@ -259,6 +243,10 @@ function getInBankDateFromPaymentWay($payDate, $paymentWay)
     }
 
     return $inBankDate;
+}
+
+function insertUploadTimeToDb() {
+
 }
 
 ?>
