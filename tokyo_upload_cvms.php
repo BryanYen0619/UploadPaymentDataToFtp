@@ -18,7 +18,7 @@ echo 'END.'.'</br>';
 function getIsPayment()
 {
     // SQL 取出fee_order符合資料
-    $searchStatusSqlCmd = "SELECT fee_order.account, fee_order.household_number, fee_order.begin_time, fee_order.virtual_account_id, fee_order.pay_time, fee_order.payment_way, fee_order.amount_payable, fee_report_details.Chcode, fee_report_details.Fee, fee_report_details.ChannelCharge
+    $searchStatusSqlCmd = "SELECT fee_order.account, fee_order.household_number, fee_order.begin_time, fee_order.virtual_account_id, fee_order.pay_time, fee_order.payment_way, fee_report_details.Chcode, fee_report_details.Fee, fee_report_details.ChannelCharge
                            FROM fee_order
                            INNER JOIN fee_report_details ON fee_report_details.CusCode LIKE CONCAT('%', fee_order.virtual_account_id, '%')
                            AND fee_order.status LIKE BINARY '%已繳費%'
@@ -34,7 +34,6 @@ function getIsPayment()
               $row['virtual_account_id'],
               $row['pay_time'],
               $row['payment_way'],
-              $row['amount_payable'],
               $row['Chcode'],
               $row['Fee'],
               $row['ChannelCharge']
@@ -59,14 +58,14 @@ function formatPaymentTxt($payment_files)
         // 取資料
         $id = substr($payment_files[$i][0], 0, 5);
             $accountId = $payment_files[$i][1];
-            $creatDate=$payment_files[$i][2];
-            $virtualAccount=$payment_files[$i][3];
-            $payDate=$payment_files[$i][4];
-            $paymentWay =$payment_files[$i][5];
-            $collectionStore='7-11';
-            $collectionMoney='7';
-            $fees='7';
-            $inBankMoney=$payment_files[$i][6];
+            $creatDate = $payment_files[$i][2];
+            $virtualAccount = $payment_files[$i][3];
+            $payDate = $payment_files[$i][4];
+            $paymentWay = $payment_files[$i][5];
+            $collectionStore = $payment_files[$i][6];
+            $collectionMoney = intval($payment_files[$i][7]);
+            $fees = intval($payment_files[$i][8]) / 100;
+            $inBankMoney = $collectionMoney + $fees;
 
         // 補位
         $id = str_pad($id, 5);
