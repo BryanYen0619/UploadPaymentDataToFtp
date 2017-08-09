@@ -18,10 +18,11 @@ echo 'END.'.'</br>';
 function getIsPayment()
 {
     // SQL 取出fee_order符合資料
-    $searchStatusSqlCmd = "SELECT *
+    $searchStatusSqlCmd = "SELECT fee_order.account, fee_order.household_number, fee_order.begin_time, fee_order.virtual_account_id, fee_order.pay_time, fee_order.payment_way, fee_order.amount_payable, fee_report_details.Chcode, fee_report_details.Fee, fee_report_details.ChannelCharge
                            FROM fee_order
-                           WHERE status LIKE BINARY '%已繳費%'
-                           AND upload_time IS NULL";
+                           INNER JOIN fee_report_details ON fee_report_details.CusCode LIKE CONCAT('%', fee_order.virtual_account_id, '%')
+                           AND fee_order.status LIKE BINARY '%已繳費%'
+                           AND fee_order.upload_time IS NULL";
     $searchStatusFromSql = mysql_query($searchStatusSqlCmd);
     if ($searchStatusFromSql) {
         $i = 0;
@@ -33,7 +34,10 @@ function getIsPayment()
               $row['virtual_account_id'],
               $row['pay_time'],
               $row['payment_way'],
-              $row['amount_payable']
+              $row['amount_payable'],
+              $row['Chcode'],
+              $row['Fee'],
+              $row['ChannelCharge']
             );
 
             $i++;
@@ -48,33 +52,33 @@ function getIsPayment()
 function formatPaymentTxt($payment_files)
 {
     if (count($payment_files) > 0) {
-      for($i = 0; $i < count($payment_files); $i++) {
-        $success = 10;
-        $error = 0;
+        for ($i = 0; $i < count($payment_files); $i++) {
+            $success = 10;
+            $error = 0;
 
         // 取資料
         $id = substr($payment_files[$i][0], 0, 5);
-        $accountId = $payment_files[$i][1];
-        $creatDate=$payment_files[$i][2];
-        $virtualAccount=$payment_files[$i][3];
-        $payDate=$payment_files[$i][4];
-        $paymentWay =$payment_files[$i][5];
-        $collectionStore='7-11';
-        $collectionMoney='7';
-        $fees='7';
-        $inBankMoney=$payment_files[$i][6];
+            $accountId = $payment_files[$i][1];
+            $creatDate=$payment_files[$i][2];
+            $virtualAccount=$payment_files[$i][3];
+            $payDate=$payment_files[$i][4];
+            $paymentWay =$payment_files[$i][5];
+            $collectionStore='7-11';
+            $collectionMoney='7';
+            $fees='7';
+            $inBankMoney=$payment_files[$i][6];
 
         // 補位
         $id = str_pad($id, 5);
-        $accountId = str_pad($accountId, 10);
-        $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
-        $virtualAccount = str_pad($virtualAccount, 14);
-        $inBankDate = str_pad($paymentWay, 7);
-        $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
-        $collectionStore = str_pad($collectionStore, 8);
-        $collectionMoney = str_pad($collectionMoney, 14);
-        $fees = str_pad($fees, 7);
-        $inBankMoney = str_pad($inBankMoney, 14);
+            $accountId = str_pad($accountId, 10);
+            $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
+            $virtualAccount = str_pad($virtualAccount, 14);
+            $inBankDate = str_pad($paymentWay, 7);
+            $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
+            $collectionStore = str_pad($collectionStore, 8);
+            $collectionMoney = str_pad($collectionMoney, 14);
+            $fees = str_pad($fees, 7);
+            $inBankMoney = str_pad($inBankMoney, 14);
 
         // 格式檢查
         if (strlen($id) != 5) {
@@ -82,57 +86,56 @@ function formatPaymentTxt($payment_files)
             $error++;
         }
 
-        if (strlen($accountId) != 10) {
-            echo 'payment_files['.$i.'] 2. accountId length error.'.'</br>';
-            $error++;
+            if (strlen($accountId) != 10) {
+                echo 'payment_files['.$i.'] 2. accountId length error.'.'</br>';
+                $error++;
+            }
+
+            if (strlen($creatDate) != 5) {
+                echo 'payment_files['.$i.'] 3. create date length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($virtualAccount) != 14) {
+                echo 'payment_files['.$i.'] 4. virtual account length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($payDate) != 7) {
+                echo 'payment_files['.$i.'] 5. pay date length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($inBankDate) != 7) {
+                echo 'payment_files['.$i.'] 6. in bank date length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($collectionStore) != 8) {
+                echo 'payment_files['.$i.'] 7. collection store length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($collectionMoney) < 0) {
+                echo 'payment_files['.$i.'] 8. collection money length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($fees) < 0) {
+                echo 'payment_files['.$i.'] 9. fees length error.', '</br>';
+                $error++;
+            }
+
+            if (strlen($inBankMoney) < 0) {
+                echo 'payment_files['.$i.'] 10. in bank money length error.', '</br>';
+                $error++;
+            }
+
+            $formatPaymentData[$i] = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
+            echo 'payment_files['.$i.'] Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
         }
 
-        if (strlen($creatDate) != 5) {
-            echo 'payment_files['.$i.'] 3. create date length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($virtualAccount) != 14) {
-            echo 'payment_files['.$i.'] 4. virtual account length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($payDate) != 7) {
-            echo 'payment_files['.$i.'] 5. pay date length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($inBankDate) != 7) {
-            echo 'payment_files['.$i.'] 6. in bank date length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($collectionStore) != 8) {
-            echo 'payment_files['.$i.'] 7. collection store length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($collectionMoney) < 0) {
-            echo 'payment_files['.$i.'] 8. collection money length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($fees) < 0) {
-            echo 'payment_files['.$i.'] 9. fees length error.', '</br>';
-            $error++;
-        }
-
-        if (strlen($inBankMoney) < 0) {
-            echo 'payment_files['.$i.'] 10. in bank money length error.', '</br>';
-            $error++;
-        }
-
-        $formatPaymentData[$i] = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
-        echo 'payment_files['.$i.'] Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
-
-      }
-
-      return $formatPaymentData;
+        return $formatPaymentData;
     }
 }
 
@@ -143,8 +146,8 @@ function saveUploadTxtFile($formatPaymentData)
         $nowDate = date('Ymd');
         $fileName = 'ToCVMS-'.$nowDate.'.TXT';
         $myfile = fopen($fileName, "w") or die("Unable to open file!");
-        for($i = 0 ; $i < count($formatPaymentData); $i++) {
-          fwrite($myfile, $formatPaymentData[$i]);
+        for ($i = 0 ; $i < count($formatPaymentData); $i++) {
+            fwrite($myfile, $formatPaymentData[$i]);
         }
         fclose($myfile);
 
