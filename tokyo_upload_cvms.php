@@ -170,7 +170,7 @@ function connectFtpServer()
     }
 
     //換目錄
-    if (ftp_chdir($conn_id, "ap-cvms")) {
+    if (ftp_chdir($conn_id, "ftp-app2cvms")) {
         echo "Current directory is now: " . ftp_pwd($conn_id) . "</br>";
     } else {
         echo "Couldn't change directory.</br>";
