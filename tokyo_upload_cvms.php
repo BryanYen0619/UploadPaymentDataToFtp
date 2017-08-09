@@ -69,16 +69,16 @@ function formatPaymentTxt($payment_files)
             $inBankMoney = $collectionMoney + $fees;
 
             // 補位
-            $id = str_pad($id, 5);
-            $accountId = str_pad($accountId, 10);
-            $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
-            $virtualAccount = str_pad($virtualAccount, 14);
-            $dueDate = str_pad(convertDateToUploadFtpFormat($dueDate), 7);
-            $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
-            $collectionStore = str_pad($collectionStore, 8);
-            $collectionMoney = str_pad($collectionMoney, 14);
-            $fees = str_pad($fees, 7);
-            $inBankMoney = str_pad($inBankMoney, 14);
+            $id = str_pad($id, 5, " ", STR_PAD_LEFT);
+            $accountId = str_pad($accountId, 10, " ", STR_PAD_LEFT);
+            $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5, " ", STR_PAD_LEFT);
+            $virtualAccount = str_pad($virtualAccount, 14, " ", STR_PAD_LEFT);
+            $dueDate = str_pad(convertDateToUploadFtpFormat($dueDate), 7, " ", STR_PAD_LEFT);
+            $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7, " ", STR_PAD_LEFT);
+            $collectionStore = str_pad($collectionStore, 8, " ", STR_PAD_LEFT);
+            $collectionMoney = str_pad($collectionMoney, 14, " ", STR_PAD_LEFT);
+            $fees = str_pad($fees, 7, " ", STR_PAD_LEFT);
+            $inBankMoney = str_pad($inBankMoney, 14, " ", STR_PAD_LEFT);
 
             // 格式檢查
             if (strlen($id) != 5) {
