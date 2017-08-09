@@ -4,9 +4,9 @@
 $reUpload = 0;
 
 $payment_files = getIsPayment();
-echo '<pre>';
-echo "Search status array size: ", var_dump($payment_files), "</br>";
-echo '</pre>';
+// echo '<pre>';
+// echo "Search status array size: ", var_dump($payment_files), "</br>";
+// echo '</pre>';
 
 $formatPaymentData = formatPaymentTxt($payment_files);
 $uploadFileName = saveUploadTxtFile($formatPaymentData);
@@ -18,25 +18,26 @@ echo 'END.'.'</br>';
 function getIsPayment()
 {
     // SQL 取出fee_order符合資料
-    $searchStatusSqlCmd = "SELECT fee_order.account, fee_order.household_number, fee_order.begin_time, fee_order.virtual_account_id, fee_order.pay_time, fee_order.payment_way, fee_report_details.Chcode, fee_report_details.Fee, fee_report_details.ChannelCharge
+    $searchStatusSqlCmd = "SELECT fee_order.account, fee_order.household_number, fee_order.begin_time, fee_order.virtual_account_id, fee_report_details.PayDate, fee_report_details.Chcode, fee_report_details.Fee, fee_report_details.DueDate, fee_report_details.ChannelCharge
                            FROM fee_order
                            INNER JOIN fee_report_details ON fee_report_details.CusCode LIKE CONCAT('%', fee_order.virtual_account_id, '%')
                            AND fee_order.status LIKE BINARY '%已繳費%'
                            AND fee_order.upload_time IS NULL";
+
     $searchStatusFromSql = mysql_query($searchStatusSqlCmd);
     if ($searchStatusFromSql) {
         $i = 0;
         while ($row= mysql_fetch_assoc($searchStatusFromSql)) {
             $payment_files[$i] = array(
-              $row['account'],
-              $row['household_number'],
-              $row['begin_time'],
-              $row['virtual_account_id'],
-              $row['pay_time'],
-              $row['payment_way'],
-              $row['Chcode'],
-              $row['Fee'],
-              $row['ChannelCharge']
+                $row['account'],
+                $row['household_number'],
+                $row['begin_time'],
+                $row['virtual_account_id'],   // 虛擬帳號
+                $row['PayDate'],    // 繳費日期
+                $row['Chcode'],   // 代收機構
+                $row['Fee'],    // 代收金額
+                $row['DueDate'],    // 預計入帳日
+                $row['ChannelCharge']   // 通路手續費
             );
 
             $i++;
@@ -55,35 +56,35 @@ function formatPaymentTxt($payment_files)
             $success = 10;
             $error = 0;
 
-        // 取資料
-        $id = substr($payment_files[$i][0], 0, 5);
+            // 取資料
+            $id = substr($payment_files[$i][0], 0, 5);
             $accountId = $payment_files[$i][1];
             $creatDate = $payment_files[$i][2];
             $virtualAccount = $payment_files[$i][3];
             $payDate = $payment_files[$i][4];
-            $paymentWay = $payment_files[$i][5];
-            $collectionStore = $payment_files[$i][6];
-            $collectionMoney = intval($payment_files[$i][7]);
+            $dueDate = $payment_files[$i][7];
+            $collectionStore = $payment_files[$i][5];
+            $collectionMoney = intval($payment_files[$i][6]);
             $fees = intval($payment_files[$i][8]) / 100;
             $inBankMoney = $collectionMoney + $fees;
 
-        // 補位
-        $id = str_pad($id, 5);
+            // 補位
+            $id = str_pad($id, 5);
             $accountId = str_pad($accountId, 10);
             $creatDate = str_pad(convertDateToUploadFtpFormat($creatDate, 'Y-m'), 5);
             $virtualAccount = str_pad($virtualAccount, 14);
-            $inBankDate = str_pad($paymentWay, 7);
+            $dueDate = str_pad(convertDateToUploadFtpFormat($dueDate), 7);
             $payDate = str_pad(convertDateToUploadFtpFormat($payDate), 7);
             $collectionStore = str_pad($collectionStore, 8);
             $collectionMoney = str_pad($collectionMoney, 14);
             $fees = str_pad($fees, 7);
             $inBankMoney = str_pad($inBankMoney, 14);
 
-        // 格式檢查
-        if (strlen($id) != 5) {
-            echo 'payment_files['.$i.'] 1. id length error.', '</br>';
-            $error++;
-        }
+            // 格式檢查
+            if (strlen($id) != 5) {
+                echo 'payment_files['.$i.'] 1. id length error.', '</br>';
+                $error++;
+            }
 
             if (strlen($accountId) != 10) {
                 echo 'payment_files['.$i.'] 2. accountId length error.'.'</br>';
@@ -105,7 +106,7 @@ function formatPaymentTxt($payment_files)
                 $error++;
             }
 
-            if (strlen($inBankDate) != 7) {
+            if (strlen($dueDate) != 7) {
                 echo 'payment_files['.$i.'] 6. in bank date length error.', '</br>';
                 $error++;
             }
@@ -115,22 +116,22 @@ function formatPaymentTxt($payment_files)
                 $error++;
             }
 
-            if (strlen($collectionMoney) < 0) {
+            if (strlen($collectionMoney) != 14) {
                 echo 'payment_files['.$i.'] 8. collection money length error.', '</br>';
                 $error++;
             }
 
-            if (strlen($fees) < 0) {
+            if (strlen($fees) != 7) {
                 echo 'payment_files['.$i.'] 9. fees length error.', '</br>';
                 $error++;
             }
 
-            if (strlen($inBankMoney) < 0) {
+            if (strlen($inBankMoney) != 14) {
                 echo 'payment_files['.$i.'] 10. in bank money length error.', '</br>';
                 $error++;
             }
 
-            $formatPaymentData[$i] = $id.$accountId.$creatDate.$virtualAccount.$payDate.$inBankDate.$collectionStore.$collectionMoney.$fees.$inBankMoney;
+            $formatPaymentData[$i] = $id.$accountId.$creatDate.$virtualAccount.$payDate.$dueDate.$collectionStore.$collectionMoney.$fees.$inBankMoneys;
             echo 'payment_files['.$i.'] Check Upload Format, Success: '. ($success - $error). ', Error: '. $error. '</br>';
         }
 
@@ -146,7 +147,7 @@ function saveUploadTxtFile($formatPaymentData)
         $fileName = 'ToCVMS-'.$nowDate.'.TXT';
         $myfile = fopen($fileName, "w") or die("Unable to open file!");
         for ($i = 0 ; $i < count($formatPaymentData); $i++) {
-            fwrite($myfile, $formatPaymentData[$i]);
+            fwrite($myfile, $formatPaymentData[$i].PHP_EOL);
         }
         fclose($myfile);
 
@@ -157,23 +158,23 @@ function saveUploadTxtFile($formatPaymentData)
 function connectFtpServer()
 {
     ### 連接的 FTP 伺服器是 localhost
-  $conn_id = ftp_connect('ip');
+    $conn_id = ftp_connect('ip');
     if ($conn_id == false) {
         echo "Connect ftp error.","</br>";
     }
 
-  ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
-  $login_result = ftp_login($conn_id, 'user', 'pass');
+    ### 登入 FTP, 帳號是 USERNAME, 密碼是 PASSWORD
+    $login_result = ftp_login($conn_id, 'user', 'pass');
     if ($login_result == false) {
         echo "Ftp login error.","</br>";
     }
 
-  //換目錄
-  if (ftp_chdir($conn_id, "ap-cvms")) {
-      echo "Current directory is now: " . ftp_pwd($conn_id) . "</br>";
-  } else {
-      echo "Couldn't change directory.</br>";
-  }
+    //換目錄
+    if (ftp_chdir($conn_id, "ap-cvms")) {
+        echo "Current directory is now: " . ftp_pwd($conn_id) . "</br>";
+    } else {
+        echo "Couldn't change directory.</br>";
+    }
 
     return $conn_id;
 }
@@ -225,7 +226,7 @@ function convertDateToUploadFtpFormat($date, $format = 'Y-m-d', $addDayCount = 0
     if ($format == 'Y-m-d') {
         $tempMonth = date('m', strtotime($date));
         $tempDay = date('d', strtotime($date)) + $addDayCount;
-        $tempMonthAndDay = $tempMonth.$tempDay;
+        $tempMonthAndDay = $tempMonth.str_pad($tempDay, 2, '0', STR_PAD_LEFT);
     }
     if ($format == 'Y-m') {
         $tempMonthAndDay = date('m', strtotime($date));
